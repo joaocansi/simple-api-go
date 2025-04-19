@@ -1,11 +1,10 @@
 package users
 
 import (
-	"encoding/json"
-	"io"
 	"net/http"
 
-	"github.com/gorilla/mux"
+	"github.com/gin-gonic/gin"
+	"github.com/joaocansi/simple-api/internal/helpers/errors"
 	"gorm.io/gorm"
 )
 
@@ -13,84 +12,66 @@ type UserHandler struct {
 	service *UserService
 }
 
-func Setup(s *mux.Router, db *gorm.DB) {
+func Setup(s *gin.RouterGroup, db *gorm.DB) {
 	service := NewUserService(db)
 	handler := &UserHandler{service}
 
-	r := s.PathPrefix("/users").Subrouter()
-	r.StrictSlash(true)
+	r := s.Group("/users")
 
-	r.HandleFunc("/", handler.createUser).Methods("POST")
-	r.HandleFunc("/sign-in", handler.signIn).Methods("POST")
+	r.POST("/", handler.createUser)
+	r.POST("/sign-in", handler.signIn)
 }
 
-func (h *UserHandler) createUser(w http.ResponseWriter, r *http.Request) {
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		w.WriteHeader(500)
-		w.Write([]byte("Error"))
-		return
+func (h *UserHandler) createUser(c *gin.Context) {
+	type Payload struct {
+		Name string `json:"name" binding:"required"`
+		Email string `json:"email" binding:"required"`
+		Password string `json:"password" binding:"required"`
+		AvatarUrl string `json:"avatarUrl" binding:"required"`
 	}
-	defer r.Body.Close()
 
-	var data CreateUser
-	err = json.Unmarshal(body, &data)
-
-	if err != nil {
-		w.WriteHeader(500)
-		w.Write([]byte("Error"))
+	var body Payload
+	if err := c.ShouldBindJSON(&body); err != nil {
+		errors.HttpError(c, err)
 		return
 	}
 
-	user, err := h.service.createUser(data)
+	user, err := h.service.createUser(CreateUser(body))
+
 	if err != nil {
-		w.WriteHeader(400)
-		w.Write([]byte(err.Error()))
+		errors.HttpError(c, err)
 		return
 	}
 
-	res, err := json.Marshal(user)
-	if err != nil {
-		w.WriteHeader(500)
-		w.Write([]byte("Error"))
-		return
-	}
-
-	w.WriteHeader(201)
-	w.Write(res)
+	c.JSON(http.StatusCreated, gin.H{
+		"id":        user.ID,
+		"name":      user.Name,
+		"email":     user.Email,
+		"avatarUrl": user.AvatarUrl,
+	})
 }
 
-func (h *UserHandler) signIn(w http.ResponseWriter, r *http.Request) {
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		w.WriteHeader(500)
-		w.Write([]byte("Error"))
+func (h *UserHandler) signIn(c *gin.Context) {
+	type Payload struct {
+		Email    string `json:"email" binding:"required"`
+		Password string `json:"password" binding:"required"`
+	}
+
+	var body Payload
+	if err := c.ShouldBindJSON(&body); err != nil {
+		errors.HttpError(c, err)
 		return
 	}
 
-	var data SignIn
-	err = json.Unmarshal(body, &data)
-
+	signInResult, err := h.service.signIn(SignIn(body))
 	if err != nil {
-		w.WriteHeader(500)
-		w.Write([]byte("Error"))
+		errors.HttpError(c, err)
 		return
 	}
 
-	session, err := h.service.signIn(data)
-	if err != nil {
-		w.WriteHeader(400)
-		w.Write([]byte(err.Error()))
-		return
-	}
-
-	res, err := json.Marshal(session)
-	if err != nil {
-		w.WriteHeader(500)
-		w.Write([]byte("Error"))
-		return
-	}
-
-	w.WriteHeader(201)
-	w.Write(res)
+	c.JSON(http.StatusOK, gin.H{
+		"accessToken": signInResult.AccessToken,
+		"expiresIn":   signInResult.ExpiresIn,
+	})
+	c.SetCookie("accessToken", signInResult.AccessToken, 3600, "/", "", false, true)
 }

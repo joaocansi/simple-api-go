@@ -1,11 +1,10 @@
 package users
 
 import (
-	"fmt"
-
-	"github.com/joaocansi/simple-api/internal/hash"
-	storage "github.com/joaocansi/simple-api/internal/storage/model"
-	"github.com/joaocansi/simple-api/internal/storage/repository"
+	"github.com/joaocansi/simple-api/internal/helpers/errors"
+	"github.com/joaocansi/simple-api/internal/helpers/hash"
+	model "github.com/joaocansi/simple-api/storage/model"
+	repository "github.com/joaocansi/simple-api/storage/repository"
 	"gorm.io/gorm"
 )
 
@@ -14,14 +13,14 @@ type UserService struct {
 }
 
 type CreateUser struct {
-	Name      string `json:"name"`
-	Email     string `json:"email"`
-	Password  string `json:"password"`
-	AvatarUrl string `json:"avatarUrl"`
+	Name      string
+	Email     string
+	Password  string
+	AvatarUrl string
 }
 
 type SignIn struct {
-	Email    string `json:"email"`
+	Email    string `json:"email"` 
 	Password string `json:"password"`
 }
 
@@ -30,15 +29,15 @@ func NewUserService(db *gorm.DB) *UserService {
 	return &UserService{userRepository}
 }
 
-func (s *UserService) createUser(data CreateUser) (*storage.User, error) {
+func (s *UserService) createUser(data CreateUser) (*model.User, *errors.ServiceError) {
 	_, err := s.userRepository.GetByEmail(data.Email)
 	if err == nil {
-		return nil, fmt.Errorf("email %s já cadastrado", data.Email)
+		return nil, errors.UserAlreadyExists()
 	}
 
 	hashedPassword, err := hash.Hash(data.Password)
 	if err != nil {
-		return nil, fmt.Errorf("não foi possível criar usuário")
+		return nil, errors.InternalError()
 	}
 
 	user, err := s.userRepository.Store(repository.CreateUserData{
@@ -49,7 +48,7 @@ func (s *UserService) createUser(data CreateUser) (*storage.User, error) {
 	})
 
 	if err != nil {
-		return nil, fmt.Errorf("não foi possível criar usuário")
+		return nil, errors.InternalError()
 	}
 
 	return user, nil
@@ -60,14 +59,14 @@ type SignInResult struct {
 	ExpiresIn   float32 `json:"expiresIn"`
 }
 
-func (s *UserService) signIn(data SignIn) (*SignInResult, error) {
+func (s *UserService) signIn(data SignIn) (*SignInResult, *errors.ServiceError) {
 	user, _ := s.userRepository.GetByEmail(data.Email)
 	if user == nil {
-		return nil, fmt.Errorf("email ou senha não está correto")
+		return nil, errors.UserNotFound()
 	}
 
 	if err := hash.Verify(data.Password, user.Password); err != nil {
-		return nil, fmt.Errorf("email ou senha não está correto")
+		return nil, errors.WrongUserCredentials()
 	}
 
 	return &SignInResult{

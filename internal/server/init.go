@@ -1,12 +1,10 @@
 package server
 
 import (
-	"net/http"
-
-	"github.com/gorilla/mux"
+	"github.com/gin-gonic/gin"
 	"github.com/joaocansi/simple-api/internal/config"
-	"github.com/joaocansi/simple-api/internal/storage"
 	"github.com/joaocansi/simple-api/internal/users"
+	"github.com/joaocansi/simple-api/storage"
 )
 
 func Init() {
@@ -20,9 +18,9 @@ func Init() {
 		panic(err)
 	}
 
-	r := mux.NewRouter()
-	s := r.PathPrefix("/api/v1").Subrouter()
+	r := gin.Default()
+	s := r.Group("/api/v1")
 
 	users.Setup(s, db)
-	http.ListenAndServe(":8080", r)
+	r.Run()
 }
