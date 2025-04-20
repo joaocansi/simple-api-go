@@ -4,3 +4,7 @@ database:
   user: user
   password: password
   dbname: mydb
+
+token:
+  secret_key: 7b2bdf7b5ed01850be22b9a20f7d5cfe
+  expiration: 3600

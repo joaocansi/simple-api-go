@@ -1,11 +1,13 @@
 package config
 
 import (
-	"io"
+	"fmt"
 	"os"
 
 	"gopkg.in/yaml.v3"
 )
+
+const configFileName = "config.yaml"
 
 type Config struct {
 	Database struct {
@@ -15,25 +17,23 @@ type Config struct {
 		Password string `yaml:"password"`
 		Name     string `yaml:"dbname"`
 	} `yaml:"database"`
+	Token struct {
+		SecretKey string `yaml:"secret_key"`
+		ExpiresIn int    `yaml:"expiration"`
+	} `yaml:"token"`
 }
 
-func Load() (*Config, error) {
-	var config Config
-	file, err := os.Open("config.yaml")
-
+func NewConfig() (*Config, error) {
+	file, err := os.Open(configFileName)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to open config file %s: %w", configFileName, err)
 	}
 	defer file.Close()
 
-	data, err := io.ReadAll(file)
-	if err != nil {
-		return nil, err
-	}
-
-	err = yaml.Unmarshal(data, &config)
-	if err != nil {
-		return nil, err
+	var config Config
+	decoder := yaml.NewDecoder(file)
+	if err := decoder.Decode(&config); err != nil {
+		return nil, fmt.Errorf("failed to decode config file %s: %w", configFileName, err)
 	}
 
 	return &config, nil

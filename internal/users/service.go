@@ -3,6 +3,7 @@ package users
 import (
 	"github.com/joaocansi/simple-api/internal/helpers/errors"
 	"github.com/joaocansi/simple-api/internal/helpers/hash"
+	"github.com/joaocansi/simple-api/internal/token"
 	model "github.com/joaocansi/simple-api/storage/model"
 	repository "github.com/joaocansi/simple-api/storage/repository"
 	"gorm.io/gorm"
@@ -10,6 +11,7 @@ import (
 
 type UserService struct {
 	userRepository *repository.UserRepository
+	tokenService *token.TokenService
 }
 
 type CreateUser struct {
@@ -24,9 +26,9 @@ type SignIn struct {
 	Password string `json:"password"`
 }
 
-func NewUserService(db *gorm.DB) *UserService {
+func NewUserService(db *gorm.DB, tokenService *token.TokenService) *UserService {
 	userRepository := repository.NewUserRepository(db)
-	return &UserService{userRepository}
+	return &UserService{userRepository, tokenService}
 }
 
 func (s *UserService) createUser(data CreateUser) (*model.User, *errors.ServiceError) {
@@ -56,7 +58,6 @@ func (s *UserService) createUser(data CreateUser) (*model.User, *errors.ServiceE
 
 type SignInResult struct {
 	AccessToken string  `json:"accessToken"`
-	ExpiresIn   float32 `json:"expiresIn"`
 }
 
 func (s *UserService) signIn(data SignIn) (*SignInResult, *errors.ServiceError) {
@@ -69,8 +70,12 @@ func (s *UserService) signIn(data SignIn) (*SignInResult, *errors.ServiceError) 
 		return nil, errors.WrongUserCredentials()
 	}
 
+	token, err := s.tokenService.GenerateToken(user.ID);
+	if err != nil {
+		return nil, errors.WrongUserCredentials()
+	}
+
 	return &SignInResult{
-		AccessToken: "Teste",
-		ExpiresIn:   1000000,
+		AccessToken: token,
 	}, nil
 }

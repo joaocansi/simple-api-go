@@ -1,9 +1,9 @@
 package main
 
 import (
-	"github.com/joaocansi/simple-api/internal/server"
+	"github.com/joaocansi/simple-api/internal/container"
 )
 
 func main() {
-	server.Init()
+	container.Init()
 }
